@@ -36,5 +36,13 @@ public class UserServiceImpl implements UserService {
         userMapper.add(map);
     }
 
+    @Override
+    public void saveBlockUser(String user, String username) {
+        userMapper.saveBlockUser(user,username);
+    }
 
+    @Override
+    public void removeBlockUser(String user, String username) {
+        userMapper.removeBlockUser(user,username);
+    }
 }
