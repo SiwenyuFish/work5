@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Select;
 import org.springframework.stereotype.Repository;
 import siwenyu.pojo.ChatMessage;
 
+import java.time.LocalDateTime;
+
 @Mapper
 @Repository
 public interface ChatMessageMapper {
@@ -15,4 +17,8 @@ public interface ChatMessageMapper {
 
     @Select("select chatmessage.id,chatmessage.`from`,chatmessage.`to`,chatmessage.content,chatmessage.created_at from chatmessage where chatmessage.id=#{uniqueChatMessageId}")
     ChatMessage getContent(Long uniqueChatMessageId);
+
+
+    @Insert("insert into chatmessage(id, `from`, `to`, content, created_at) VALUES (#{id},#{from},#{to},#{content},#{createdAt})")
+    void saveContentMq(Long id, String from, String to, String content, LocalDateTime createdAt);
 }

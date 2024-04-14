@@ -17,6 +17,12 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         chatMessageMapper.saveContent(uniqueChatMessageId,from,to,content);
     }
 
+
+    @Override
+    public void saveContent(ChatMessage chatMessage) {
+        chatMessageMapper.saveContentMq(chatMessage.getId(), chatMessage.getFrom(), chatMessage.getTo(),chatMessage.getContent(),chatMessage.getCreatedAt());
+    }
+
     @Override
     public ChatMessage getContent(Long uniqueChatMessageId) {
         return chatMessageMapper.getContent(uniqueChatMessageId);

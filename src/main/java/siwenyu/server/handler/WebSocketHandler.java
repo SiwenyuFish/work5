@@ -9,6 +9,8 @@ import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.util.AttributeKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -25,6 +27,7 @@ import siwenyu.utils.JwtUtil;
 import siwenyu.utils.SnowFlakeUtil;
 
 
+import java.time.LocalDateTime;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +52,8 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<TextWebSocketF
     @Qualifier("redisTemplate")
     private RedisTemplate redisTemplate;
 
-
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
     /**
      * 一旦连接，第一个被执行
@@ -142,15 +146,14 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<TextWebSocketF
             return;
         }
         Long uniqueChatMessageId=SnowFlakeUtil.getSnowFlakeId();
-        //保存到数据库
-        //群聊名加上group前缀和用户名作区分
-        chatMessageService.saveContent(uniqueChatMessageId,from,"[group]"+groupname,content);
 
-        ChatMessage chatMessage=chatMessageService.getContent(uniqueChatMessageId);
-        log.info(chatMessage.toString());
+        ChatMessage chatMessage=new ChatMessage(uniqueChatMessageId,from,"[group]"+groupname,content,LocalDateTime.now());
 
-        redisTemplate.opsForList().leftPush("[group]"+groupname+"record",uniqueChatMessageId+"群聊天记录");
-        redisTemplate.opsForValue().set(uniqueChatMessageId+"群聊天记录",chatMessage);
+        try {
+            rabbitTemplate.convertAndSend("groupOnline.topic","groupOnline",chatMessage);
+        } catch (AmqpException e) {
+            log.error("群聊在线消息写入数据库或redis失败");
+        }
 
         Set<String> members = group1.getMembers();
         for (Iterator<String> iterator = members.iterator(); iterator.hasNext(); ) {
@@ -166,7 +169,6 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<TextWebSocketF
 
             }
         }
-
 
     }
 
@@ -238,34 +240,27 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<TextWebSocketF
 
         Long uniqueChatMessageId=SnowFlakeUtil.getSnowFlakeId();
 
-        //保存到数据库
-        chatMessageService.saveContent(uniqueChatMessageId,from,to,content);
+        ChatMessage chatMessage=new ChatMessage(uniqueChatMessageId,from,to,content, LocalDateTime.now());
 
-        ChatMessage chatMessage=chatMessageService.getContent(uniqueChatMessageId);
 
-        log.info(chatMessage.toString());
-
-        //用户1发送给用户2 和 用户2发送给用户1 的聊天记录id存放在同一个list
+        //通知消息写入mysql和redis
         try {
-            if((int)(redisTemplate.opsForValue().get(to+from))==1) {
-                redisTemplate.opsForList().leftPush(to + from+"record", uniqueChatMessageId + "聊天记录");
-            }
-        } catch (Exception e) {
-            redisTemplate.opsForValue().set(from+to,1);
-            redisTemplate.opsForList().leftPush(from+to+"record", uniqueChatMessageId+"聊天记录");
+            rabbitTemplate.convertAndSend("online.topic","online",chatMessage);
+        } catch (AmqpException e) {
+            log.error("在线消息写入数据库或redis失败");
         }
-
-        //存储聊天消息
-        redisTemplate.opsForValue().set(uniqueChatMessageId+"聊天记录",chatMessage);
-
 
         if(NettyConfig.getChannelMap().containsKey(to)) {
             //在线消息
             NettyConfig.getChannel(to).writeAndFlush(new TextWebSocketFrame(content));
         }else {
             //离线消息发送
-            redisTemplate.opsForList().leftPush(to+"离线record",uniqueChatMessageId+"离线聊天记录");
-            redisTemplate.opsForValue().set(uniqueChatMessageId+"离线聊天记录",chatMessage);
+            //通知离线消息写入redis
+            try {
+                rabbitTemplate.convertAndSend("offline.topic","offline",chatMessage);
+            } catch (AmqpException e) {
+                log.error("离线消息写入redis失败");
+            }
 
             ctx.channel().writeAndFlush(new TextWebSocketFrame(to+"未登录,发送离线消息"));
         }
