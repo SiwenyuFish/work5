@@ -82,7 +82,7 @@ public class RabbitMqListener {
 
         Long uniqueChatMessageId= chatMessage.getId();
 
-        redisTemplate.opsForList().leftPush("[group]"+groupname+"record",uniqueChatMessageId+"群聊天记录");
+        redisTemplate.opsForList().leftPush(groupname+"record",uniqueChatMessageId+"群聊天记录");
         redisTemplate.opsForValue().set(uniqueChatMessageId+"群聊天记录",chatMessage);
 
     }
