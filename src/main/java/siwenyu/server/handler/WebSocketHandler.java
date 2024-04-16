@@ -148,6 +148,7 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<TextWebSocketF
         Long uniqueChatMessageId=SnowFlakeUtil.getSnowFlakeId();
 
         ChatMessage chatMessage=new ChatMessage(uniqueChatMessageId,from,"[group]"+groupname,content,LocalDateTime.now());
+        log.info("进入mq前"+chatMessage.toString());
 
         try {
             rabbitTemplate.convertAndSend("groupOnline.topic","groupOnline",chatMessage);
@@ -193,11 +194,11 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<TextWebSocketF
             pageNum = (int)map.get("pageNum");
             pageSize = (int)map.get("pageSize");
             list = redisTemplate.opsForList().range(to + from + "record", pageNum, pageNum+pageSize-1);
-            if(list==null)
+            if(list==null||list.isEmpty())
                 list = redisTemplate.opsForList().range(from + to + "record", pageNum, pageNum+pageSize-1);
         } catch (Exception e) {
             list = redisTemplate.opsForList().range(from + to + "record", 0, -1);
-            if(list==null)
+            if(list==null||list.isEmpty())
                 list = redisTemplate.opsForList().range(to + from + "record", 0, -1);
         }
 
