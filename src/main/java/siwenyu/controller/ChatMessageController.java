@@ -32,9 +32,6 @@ import java.util.Map;
 public class ChatMessageController {
 
     @Autowired
-    private ChatMessageService chatMessageService;
-
-    @Autowired
     private UserService userService;
 
     @Autowired

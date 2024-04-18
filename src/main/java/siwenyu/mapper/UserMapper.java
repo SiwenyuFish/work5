@@ -21,6 +21,6 @@ public interface UserMapper {
     @Insert("insert into block (user, blockeduser) VALUES (#{user},#{username})")
     void saveBlockUser(String user, String username);
 
-    @Delete("delete from block where user=#{user} and blockeduser=#{username}")
+    @Delete("delete from block where binary user=#{user} and binary blockeduser=#{username}")
     void removeBlockUser(String user, String username);
 }
