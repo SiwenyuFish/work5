@@ -3,6 +3,8 @@ package siwenyu.controller;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -22,6 +24,7 @@ import siwenyu.utils.AliOssUtil;
 import siwenyu.utils.SnowFlakeUtil;
 import siwenyu.utils.ThreadLocalUtil;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @RestController
@@ -40,6 +43,9 @@ public class ChatMessageController {
     @Autowired
     @Qualifier("redisTemplate")
     private RedisTemplate redisTemplate;
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
     private static final Logger log = LoggerFactory.getLogger(NettyServer.class);
 
@@ -82,24 +88,16 @@ public class ChatMessageController {
         Long uniqueChatMessageId=SnowFlakeUtil.getSnowFlakeId();
 
 
-        chatMessageService.saveContent(uniqueChatMessageId,from,to,url);
-
-        ChatMessage chatMessage=chatMessageService.getContent(uniqueChatMessageId);
+        ChatMessage chatMessage=new ChatMessage(uniqueChatMessageId,from,to,url, LocalDateTime.now());
 
         log.info(chatMessage.toString());
 
-        //用户1发送给用户2 和 用户2发送给用户1 的聊天记录id存放在同一个list
+        //通知消息写入mysql和redis
         try {
-            if((int)(redisTemplate.opsForValue().get(to+from))==1) {
-                redisTemplate.opsForList().leftPush(to + from+"record", uniqueChatMessageId + "聊天记录");
-            }
-        } catch (Exception e) {
-            redisTemplate.opsForValue().set(from+to,1);
-            redisTemplate.opsForList().leftPush(from+to+"record", uniqueChatMessageId+"聊天记录");
+            rabbitTemplate.convertAndSend("online.topic","online",chatMessage);
+        } catch (AmqpException e) {
+            log.error("在线消息写入数据库或redis失败");
         }
-
-        //存储聊天消息
-        redisTemplate.opsForValue().set(uniqueChatMessageId+"聊天记录",chatMessage);
 
 
         if(NettyConfig.getChannelMap().containsKey(to)) {
@@ -107,8 +105,12 @@ public class ChatMessageController {
             NettyConfig.getChannel(to).writeAndFlush(new TextWebSocketFrame(url));
         }else {
             //离线消息发送
-            redisTemplate.opsForList().leftPush(to+"离线record",uniqueChatMessageId+"离线聊天记录");
-            redisTemplate.opsForValue().set(uniqueChatMessageId+"离线聊天记录",chatMessage);
+            //通知离线消息写入redis
+            try {
+                rabbitTemplate.convertAndSend("offline.topic","offline",chatMessage);
+            } catch (AmqpException e) {
+                log.error("离线消息写入redis失败");
+            }
 
             NettyConfig.getChannel(from).writeAndFlush(new TextWebSocketFrame(to+"未登录,发送离线消息"));
         }
