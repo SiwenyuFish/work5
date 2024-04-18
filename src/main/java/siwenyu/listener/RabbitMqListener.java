@@ -46,7 +46,7 @@ public class RabbitMqListener {
     public void listenOnlineQueue(ChatMessage chatMessage){
 
         //保存到数据库
-        chatMessageService.saveContent(chatMessage.getId(), chatMessage.getFrom(), chatMessage.getTo(), chatMessage.getContent());
+        chatMessageService.saveContent(chatMessage);
 
         log.info(chatMessage.toString());
 
@@ -73,7 +73,7 @@ public class RabbitMqListener {
             exchange = @Exchange(name = "groupOnline.topic",type = ExchangeTypes.TOPIC),key = "groupOnline"))
     public void listenGroupOnlineQueue(ChatMessage chatMessage){
 
-        chatMessageService.saveContent(chatMessage.getId(), chatMessage.getFrom(), chatMessage.getTo(), chatMessage.getContent());
+        chatMessageService.saveContent(chatMessage);
 
         log.info(chatMessage.toString());
 
