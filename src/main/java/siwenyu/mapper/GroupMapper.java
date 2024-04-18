@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 public interface GroupMapper {
 
 
-    @Select("select `group`.members from `group`where name=#{groupname}")
+    @Select("select `group`.members from `group`where binary name=#{groupname}")
     String getMembersByGroupName(String groupname);
 
     @Insert("insert into `group` (number, name, members) VALUES (#{snowFlakeId},#{groupname},#{members})")

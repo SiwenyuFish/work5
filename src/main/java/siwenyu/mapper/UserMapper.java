@@ -13,7 +13,7 @@ import java.util.HashMap;
 @Repository
 public interface UserMapper {
 
-    @Select("select user.id,user.username,user.password from user where username =#{username}")
+    @Select("select user.id,user.username,user.password from user where binary username =#{username}")
     User findByUserName(String username);
 
     void add(HashMap<String, Object> map);
