@@ -14,8 +14,10 @@ import org.springframework.web.multipart.MultipartFile;
 import siwenyu.config.NettyConfig;
 import siwenyu.pojo.ChatMessage;
 import siwenyu.pojo.Result;
+import siwenyu.pojo.User;
 import siwenyu.server.NettyServer;
 import siwenyu.server.service.ChatMessageService;
+import siwenyu.server.service.UserService;
 import siwenyu.utils.AliOssUtil;
 import siwenyu.utils.SnowFlakeUtil;
 import siwenyu.utils.ThreadLocalUtil;
@@ -28,6 +30,9 @@ public class ChatMessageController {
 
     @Autowired
     private ChatMessageService chatMessageService;
+
+    @Autowired
+    private UserService userService;
 
     @Autowired
     private AliOssUtil aliOssUtil;
@@ -47,6 +52,25 @@ public class ChatMessageController {
         if(NettyConfig.getChannel(from)==null){
             return Result.error("请先连接websocket...");
         }
+
+        //根据用户名查询用户
+        User loginUser = userService.findByUserName(to);
+        //判断该用户是否存在
+        if (loginUser == null) {
+            NettyConfig.getChannel(from).writeAndFlush(new TextWebSocketFrame("该用户不存在"));
+            return Result.error("用户不存在");
+        }
+
+        //判断有没有被屏蔽
+        try {
+            if((int)redisTemplate.opsForValue().get(to+"block"+from)==1){
+                NettyConfig.getChannel(from).writeAndFlush(new TextWebSocketFrame("用户"+to+"屏蔽了你,消息无法发送"));
+                return Result.error("该用户屏蔽了你");
+            }
+        } catch (Exception e) {
+            log.info("...");
+        }
+
 
         String originalFilename = file.getOriginalFilename();
 
